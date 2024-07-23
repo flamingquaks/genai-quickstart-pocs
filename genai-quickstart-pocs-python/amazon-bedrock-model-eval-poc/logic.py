@@ -1,4 +1,3 @@
-import csv
 import warnings
 from bs4 import MarkupResemblesLocatorWarning, BeautifulSoup
 import pandas as pd
@@ -80,25 +79,17 @@ def aggregate_q_and_a_records(df: pd.DataFrame):
     return output_df
 
 
-def get_column_headers(csv_file):
+def get_column_headers(excel_file):
     """
-    Returns an array of values that represent the first row values (which are the column headers) from a CSV file.
+    Returns an array of values that represent the first row values (which are the column headers) from an excel file.
 
     Args:
-        csv_file (str): The path to the CSV file.
+        excel_file (str): The path to the excel file.
     """
-    with open(csv_file, "r", encoding="utf-8-sig") as file:
-        reader = csv.reader(file)
-        headers_output = next(reader)
-        x = 0
-        headers = []
-        for i in headers_output:
-            if not i:
-                headers.append({"id": x, "name": "Column " + str(x + 1)})
-            else:
-                headers.append({"id": x, "name": strip_html(i)})
-            x += 1
 
+    headers = [header for header in pd.read_excel(excel_file, index_col=0, nrows=1).columns.tolist() if not "unnamed" in header.lower()]
+
+    print(f"Data Table Headers: {headers}")
     return headers
 
 

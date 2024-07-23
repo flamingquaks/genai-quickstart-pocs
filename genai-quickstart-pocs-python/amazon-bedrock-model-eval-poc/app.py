@@ -35,24 +35,24 @@ prompt_instructions = [
 
 def get_upload_form(xkey):
     """
-    Generates the upload form and returns the form and csv file uploaded in the form
+    Generates the upload form and returns the form and excel file uploaded in the form
 
     Returns:
         upload_form (st.form): The upload form
-        csv_file (st.file_uploader): The CSV file uploaded
+        excel_file (st.file_uploader): The Excel file uploaded
     """
     upload_form = st.status("Upload Data", expanded=True)
-    upload_form.subheader("Upload Data CSV")
+    upload_form.subheader("Upload Excel Data")
     upload_form.info(
-        "Select the CSV file that contains the data that will be used for model evaluation."
+        "Select the Excel file that contains the data that will be used for model evaluation."
     )
     # Get configuration input from user
-    csv_file = upload_form.file_uploader(
-        "Upload CSV file", type="csv", key=f"file_upload_{xkey}"
+    excel_file = upload_form.file_uploader(
+        "Upload Excel file", type="xlsx", key=f"file_upload_{xkey}"
     )
     return (
         upload_form,
-        csv_file,
+        excel_file,
     )
 
 
@@ -74,13 +74,13 @@ def get_base_configuration_form():
         "Configure the base settings for your model evaluation promptset."
     )
     has_header_row = base_config_form.checkbox(
-        "CSV Data has Header Row",
+        "Excel Data has Header Row",
         value=True,
         disabled=True,
-        help="If the first row of the CSV are the column names, check this box. If there isn't a header row, uncheck this box.",
+        help="If the first row of the Excel data is the column names, check this box. If there isn't a header row, uncheck this box.",
     )
     base_config_form.write(
-        ":warning: Currently, only CSVs with column headers is supported. If your CSV doesn't have headers, please add them and try again."
+        ":warning: Currently, only Excel documents with column headers is supported. If your Excel document doesn't have headers, please add them and try again."
     )
     prompt_type_value = base_config_form.selectbox(
         "Prompt Type",
@@ -105,57 +105,57 @@ def get_base_configuration_form():
     return base_config_form, has_header_row, prompt_type, answer_choices_format
 
 
-def get_q_and_a_form_data(headers, csv_data, answer_choices_format):
+def get_q_and_a_form_data(headers, excel_data, answer_choices_format):
     """
     Gets the Q&A form data
     Args:
         headers (list): The column headers
-        csv_data (pd.DataFrame): The CSV data
+        excel_data (pd.DataFrame): The Excel data
 
     Returns:
         dict: The form data
     """
     details_form = st.status("Provide Q&A details", expanded=True)
     details_form.subheader("Q&A Details")
-    details_form.write("Please map the fields below to their CSV columns.")
+    details_form.write("Please map the fields below to their Excel columns.")
     details_form.info(
         ":warning: Currently, only Q & A data is supported if the answers each have an individual row value associated with the same question ID. At this time, having answers in one row is not supported."
     )
     form_fields = {
         "question_id": details_form.selectbox(
             "Question ID Column",
-            [option.get("name") for option in headers],
+            headers,
             index=None,
             help="Which column contains a question identifier? The identifier should be a column that has a unique value that is the same across all rows for the same question.",
         ),
         "question": details_form.selectbox(
             "Question Column",
-            [option.get("name") for option in headers],
+            headers,
             index=None,
             help="Which column contains the question text?",
         ),
         "answer": details_form.selectbox(
             "Answer Column",
-            [option.get("name") for option in headers],
+            headers,
             index=None,
             help="Which column contains the answer text?",
         ),
         "is_correct": details_form.selectbox(
             "Is Correct Column",
-            [option.get("name") for option in headers],
+            headers,
             index=None,
             help="Which column indicates if the answer to the question is correct or not? This column should be 1/0 or true/false",
         ),
         "category": details_form.selectbox(
             "Category Column",
-            [option.get("name") for option in headers],
+            headers,
             index=None,
             help="Which column contains the value use to categorize questions?",
         ),
     }
 
     if is_form_complete(form_fields):
-        data = select_columns(csv_data, form_fields.values())
+        data = select_columns(excel_data, form_fields.values())
         data = data.rename(
             columns={
                 form_fields["question_id"]: "question_id",
@@ -175,7 +175,7 @@ def get_q_and_a_form_data(headers, csv_data, answer_choices_format):
 
 def get_form_data_with_checkboxes(
     headers,
-    csv_data,
+    excel_data,
     prompt_type: str,
     header_text: str,
     subheader_text: str,
@@ -185,7 +185,7 @@ def get_form_data_with_checkboxes(
     Gets the form data with checkboxes
     Args:
         headers (list): The column headers
-        csv_data (pd.DataFrame): The CSV data
+        excel_data (pd.DataFrame): The Excel data
         header_text (str): The header text
         subheader_text (str): The subheader text
 
@@ -265,7 +265,7 @@ def get_form_data_with_checkboxes(
                 form_fields[expected_response] = True
             if category:
                 form_fields[category] = True
-            data = select_columns(csv_data, [k for k, v in form_fields.items() if v])
+            data = select_columns(excel_data, [k for k, v in form_fields.items() if v])
             print(f"data from selected columns {data}")
             if prompt_type == "TextSummarization":
                 data = generate_bedrock_prompts(
@@ -317,8 +317,8 @@ def main():
     data: pd.DataFrame = None
     prompt_type = ""
     # First we want an upload form to allow the user to upload their data
-    upload_form, csv_file = get_upload_form(st.session_state["xkey"])
-    if csv_file is not None:
+    upload_form, excel_file = get_upload_form(st.session_state["xkey"])
+    if excel_file is not None:
         upload_form.update(label="Data Uploaded", expanded=False, state="complete")
         base_config_form, has_header_row, prompt_type, answer_choices_format = (
             get_base_configuration_form()
@@ -329,49 +329,49 @@ def main():
             or (prompt_type == "QAndA" and answer_choices_format is not None)
         ):
             if has_header_row:
-                headers = get_column_headers(csv_file.name)
+                headers = get_column_headers(excel_file)
             else:
                 headers = None
-            csv_data = pd.read_csv(
-                csv_file, skip_blank_lines=True, header=0 if has_header_row else None
+            excel_data = pd.read_excel(
+                excel_file, 
             )
             base_config_form.update(
                 label="Base Configuration Complete",
                 expanded=False,
                 state="complete",
             )
-            csv_data.dropna(how="all", inplace=True)
+            excel_data.dropna(how="all", inplace=True)
             match prompt_type:
                 case "QAndA":
                     data = get_q_and_a_form_data(
-                        headers, csv_data, answer_choices_format
+                        headers, excel_data, answer_choices_format
                     )
                     pass
                 case "TextSummarization":
                     data = get_form_data_with_checkboxes(
                         headers,
-                        csv_data,
+                        excel_data,
                         prompt_type,
                         "Text Summarization",
-                        "Complete the form to map CSV data to Text Summarization prompts.",
+                        "Complete the form to map Excel data to Text Summarization prompts.",
                     )
                     pass
                 case "TextGeneration":
                     data = get_form_data_with_checkboxes(
                         headers,
-                        csv_data,
+                        excel_data,
                         prompt_type,
                         "Text Generation",
-                        "Complete the form to map CSV data to Text Generation prompts.",
+                        "Complete the form to map Excel data to Text Generation prompts.",
                     )
                     pass
                 case "Classification":
                     data = get_form_data_with_checkboxes(
                         headers,
-                        csv_data,
+                        excel_data,
                         prompt_type,
                         "Classification",
-                        "Complete the form to map CSV data to Classification prompts.",
+                        "Complete the form to map Excel data to Classification prompts.",
                         include_categories_input=True,
                     )
     if data is not None:
